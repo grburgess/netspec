@@ -1,3 +1,4 @@
+from typing import Union, Optional, List
 import h5py
 import numba as nb
 import numpy as np
@@ -54,6 +55,8 @@ class Transformer:
         param_max: np.ndarray,
         value_min: np.ndarray,
         value_max: np.ndarray,
+        energies: np.ndarray,
+        parameter_names: Optional[List[str]] = None,
     ) -> None:
 
         self._param_min = param_min
@@ -77,40 +80,102 @@ class Transformer:
 
         self._value_min_max_difference[idx] = 1
 
-    def to_file(self, file_name: str) -> None:
+        self._energies: np.ndarray = energies
 
-        with h5py.File(file_name, "w") as f:
+        self._parameter_names: Optional[List[str]] = parameter_names
 
-            f.create_dataset(
-                "param_min", data=self._param_min, compression="gzip"
-            )
-            f.create_dataset(
-                "param_max", data=self._param_max, compression="gzip"
-            )
-            f.create_dataset(
-                "value_min", data=self._value_min, compression="gzip"
-            )
-            f.create_dataset(
-                "value_max", data=self._value_max, compression="gzip"
-            )
+    @property
+    def parameter_names(self) -> Optional[List[str]]:
+        return self._parameter_names
+
+    @property
+    def energies(self) -> np.ndarray:
+        return self._energies
+
+    def to_file(self, file_name: Union[str, h5py.Group]) -> None:
+
+        if isinstance(file_name, h5py.Group):
+
+            f = file_name
+
+            is_file: bool = False
+
+        else:
+
+            f = h5py.File(file_name, "w")
+            is_file = True
+
+        if self._parameter_names is not None:
+
+            for i in range(len(self._parameter_names)):
+
+                f.attrs[f"par_{i}"] = self._parameter_names[i]
+
+        f.create_dataset("param_min", data=self._param_min, compression="gzip")
+        f.create_dataset("param_max", data=self._param_max, compression="gzip")
+        f.create_dataset("value_min", data=self._value_min, compression="gzip")
+        f.create_dataset("value_max", data=self._value_max, compression="gzip")
+
+        f.create_dataset("energies", data=self._energies, compression="gzip")
+
+        if is_file:
+
+            f.close()
 
     @classmethod
-    def from_file(cls, file_name: str) -> "Transformer":
+    def from_file(cls, file_name: Union[str, h5py.Group]) -> "Transformer":
 
-        with h5py.File(file_name, "r") as f:
+        if isinstance(file_name, h5py.Group):
 
-            param_min: np.ndarray = f["param_min"][()]
-            param_max: np.ndarray = f["param_max"][()]
+            f = file_name
 
-            value_min: np.ndarray = f["value_min"][()]
-            value_max: np.ndarray = f["value_max"][()]
+            is_file: bool = False
+
+        else:
+
+            f = h5py.File(file_name, "r")
+            is_file = True
+
+        if "par_0" in f.attrs:
+
+            parameter_names = []
+
+            for i in range(len(f.attrs)):
+
+                parameter_names.append(f.attrs[f"par_{i}"])
+
+        else:
+
+            parameter_names = None
+
+        param_min: np.ndarray = f["param_min"][()]
+        param_max: np.ndarray = f["param_max"][()]
+
+        value_min: np.ndarray = f["value_min"][()]
+        value_max: np.ndarray = f["value_max"][()]
+
+        energies: np.ndarray = f["energies"][()]
+
+        if is_file:
+
+            f.close()
 
         return cls(
             param_min=param_min,
             param_max=param_max,
             value_min=value_min,
             value_max=value_max,
+            energies=energies,
+            parameter_names=parameter_names,
         )
+
+    @property
+    def param_min(self) -> np.ndarray:
+        return self._param_min
+
+    @property
+    def param_max(self) -> np.ndarray:
+        return self._param_max
 
     def transform_parameters(self, parameters: np.ndarray) -> np.ndarray:
 
@@ -150,6 +215,7 @@ class TransformedData:
         param_max: np.ndarray,
         value_min: np.ndarray,
         value_max: np.ndarray,
+        energies: np.ndarray,
     ) -> None:
 
         self._params = params
@@ -162,7 +228,7 @@ class TransformedData:
         self._value_max = value_max
 
         self._transformer: Transformer = Transformer(
-            param_min, param_max, value_min, value_max
+            param_min, param_max, value_min, value_max, energies
         )
 
     def to_file(self, file_name: str) -> None:
@@ -182,6 +248,10 @@ class TransformedData:
                 "value_max", data=self._value_max, compression="gzip"
             )
 
+            f.create_dataset(
+                "energies", data=self._transformer.energies, compression="gzip"
+            )
+
             f.create_dataset("params", data=self._params, compression="gzip")
             f.create_dataset("values", data=self._values, compression="gzip")
 
@@ -198,6 +268,7 @@ class TransformedData:
 
             params: np.ndarray = f["params"][()]
             values: np.ndarray = f["values"][()]
+            energies: np.ndarray = f["energies"][()]
 
         return cls(
             params=params,
@@ -206,6 +277,7 @@ class TransformedData:
             param_max=param_max,
             value_min=value_min,
             value_max=value_max,
+            energies=energies,
         )
 
     @property
@@ -271,6 +343,8 @@ def prepare_training_data(
         param_max=param_max,
         value_min=value_min,
         value_max=value_max,
+        energies=database.energy_grid,
+        parameter_names=database.parameter_names,
     )
 
     squashed_data = transformer.transform_values(
@@ -288,6 +362,7 @@ def prepare_training_data(
         param_max=param_max,
         value_min=value_min,
         value_max=value_max,
+        energies=database.energy_grid,
     )
 
     transformed_data.to_file(f"{file_name_stub}.h5")

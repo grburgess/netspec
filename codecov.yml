@@ -1,0 +1,3 @@
+ignore:
+  - "netspec/test"
+  - "netspec/_version.py"

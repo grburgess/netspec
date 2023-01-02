@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple
 
 import torch
 from torch import Tensor, utils
+import pytorch_lightning as pl
 
 
 class PrepareData(utils.data.Dataset):
@@ -20,12 +21,21 @@ class PrepareData(utils.data.Dataset):
         return self.X[idx], self.y[idx]
 
 
-class Lore:
+class Lore(pl.LightningDataModule):
     """
     Controls the data
     """
 
-    def __init__(self, x, y, split_ratio: float = 0.2) -> None:
+    def __init__(
+        self,
+        x,
+        y,
+        train_batch_size: int,
+        val_batch_size: int,
+        split_ratio: float = 0.2,
+    ) -> None:
+
+        super().__init__()
 
         self._data_set: utils.data.DataSet = PrepareData(x, y)
 
@@ -34,6 +44,9 @@ class Lore:
 
         self._train_set: Optional[utils.data.DataSet] = None
         self._valid_set: Optional[utils.data.DataSet] = None
+
+        self._train_batch_size: int = train_batch_size
+        self._val_batch_size: int = val_batch_size
 
         # split the data
 
@@ -48,33 +61,29 @@ class Lore:
         self._valid_set_size = len(self._data_set) - self._train_set_size
 
         self._train_set, self._valid_set = utils.data.random_split(
-            self._data_set, [self._train_set_size, self._valid_set_size]
+            self._data_set,
+            [self._train_set_size, self._valid_set_size],
+            generator=torch.Generator().manual_seed(42),
         )
 
         self._data_was_split = True
 
-    def train_loader(
-        self, batch_size: int, shuffle: bool = True, num_workers: int = 1
-    ) -> utils.data.DataLoader:
+    def train_dataloader(self) -> utils.data.DataLoader:
 
         train_loader = utils.data.DataLoader(
             self._train_set,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
+            batch_size=self._train_batch_size,
+            shuffle=True,
         )
 
         return train_loader
 
-    def valid_loader(
-        self, batch_size: int, shuffle: bool = False, num_workers: int = 1
-    ) -> utils.data.DataLoader:
+    def val_dataloader(self) -> utils.data.DataLoader:
 
         valid_loader = utils.data.DataLoader(
             self._valid_set,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
+            batch_size=self._val_batch_size,
+            shuffle=False,
         )
 
         return valid_loader

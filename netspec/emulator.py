@@ -62,6 +62,13 @@ class NeuralNet(nn.Module):
         return self.layers(x)
 
 
+
+
+# def save_model(model_name: str, transformer:, checkpoint_file: str) -> None:
+
+#         pass
+
+
 @dataclass
 class ModelParams:
     n_parameters: int
@@ -140,6 +147,26 @@ class ModelStorage:
 
                 f.attrs[k] = v
 
+    def save_to_user_dir(
+        self, model_name: str, overwrite: bool = False
+    ) -> None:
+
+        # Get the data directory
+
+        data_dir_path: Path = get_user_data_path()
+
+        # Sanitize the data file
+
+        filename_sanitized = data_dir_path.absolute() / f"{model_name}.h5"
+
+        if filename_sanitized.exists() and (not overwrite):
+
+            log.error(f"{model_name}.h5 already exists!")
+
+            raise RuntimeError(f"{model_name}.h5 already exists!")
+
+        self.to_file(filename_sanitized.as_posix())
+
 
 class EmulatorModel(Function1D, metaclass=FunctionMeta):
 
@@ -182,6 +209,9 @@ class EmulatorModel(Function1D, metaclass=FunctionMeta):
         (default), use the same name as model_name
         :return: none
         """
+
+
+        self._log_interp: bool = log_interp
 
         # Get the data directory
 
@@ -300,4 +330,12 @@ class EmulatorModel(Function1D, metaclass=FunctionMeta):
 
         e_tilde = self._energies * scale
 
-        return np.interp(energies * (1 + redshift), e_tilde, net_output) / scale
+        if self._log_interp:
+
+
+            return np.interp(np.log(energies * (1 + redshift)), np.log(e_tilde), net_output) / scale
+
+        else:
+
+
+            return np.interp(energies * (1 + redshift), e_tilde, net_output) / scale

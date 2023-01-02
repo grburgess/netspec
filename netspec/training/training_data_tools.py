@@ -4,6 +4,10 @@ import numba as nb
 import numpy as np
 from ronswanson import Database
 
+from ..utils.logging import setup_logger
+
+log = setup_logger(__name__)
+
 
 def first_last_nonzero(arr, axis, invalid_val=-1):
     mask = arr > 0.0
@@ -313,8 +317,11 @@ def prepare_training_data(
 
                 ok_idx[i] = 0
 
+        log.info(f"there were {(~ok_idx).sum()} dirty entries")
+
         zero_idx = zero_idx & ok_idx
 
+    log.info("scaling parameters")
     # scale the parmeters
     param_min, param_max = min_max_fit(database.grid_points[~zero_idx])
 
@@ -327,6 +334,8 @@ def prepare_training_data(
     )
 
     # now min, max data
+
+    log.info("scaling values")
 
     value_min, value_max = min_max_fit(transformed_data)
 
@@ -347,6 +356,8 @@ def prepare_training_data(
         parameter_names=database.parameter_names,
     )
 
+    log.info("normalizing")
+
     squashed_data = transformer.transform_values(
         database.values[~zero_idx].astype("float64") * normalization_factor
     )
@@ -354,6 +365,8 @@ def prepare_training_data(
     squashed_params = transformer.transform_parameters(
         database.grid_points[~zero_idx]
     )
+
+    log.info("writing training data")
 
     transformed_data: TransformedData = TransformedData(
         params=squashed_params,

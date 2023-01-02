@@ -32,6 +32,9 @@ class Lore(pl.LightningDataModule):
         y,
         train_batch_size: int,
         val_batch_size: int,
+        train_num_workers: int =1,
+        val_num_workers: int = 1,
+
         split_ratio: float = 0.2,
     ) -> None:
 
@@ -47,6 +50,9 @@ class Lore(pl.LightningDataModule):
 
         self._train_batch_size: int = train_batch_size
         self._val_batch_size: int = val_batch_size
+
+        self._train_num_workers: int = train_num_workers
+        self._val_num_workers: int = val_num_workers
 
         # split the data
 
@@ -74,6 +80,7 @@ class Lore(pl.LightningDataModule):
             self._train_set,
             batch_size=self._train_batch_size,
             shuffle=True,
+            num_workers=self._train_batch_size
         )
 
         return train_loader
@@ -84,6 +91,7 @@ class Lore(pl.LightningDataModule):
             self._valid_set,
             batch_size=self._val_batch_size,
             shuffle=False,
+            num_workers=self._val_num_workers
         )
 
         return valid_loader

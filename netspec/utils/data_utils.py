@@ -80,7 +80,7 @@ class Lore(pl.LightningDataModule):
             self._train_set,
             batch_size=self._train_batch_size,
             shuffle=True,
-            num_workers=self._train_batch_size
+            num_workers=self._train_num_workers
         )
 
         return train_loader

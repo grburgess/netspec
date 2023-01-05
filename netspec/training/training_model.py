@@ -3,36 +3,23 @@ from typing import Any, Dict, Optional, Tuple, List
 from torch import optim, nn, utils, Tensor
 import torch
 import pytorch_lightning as pl
+from torchmetrics import MeanAbsoluteError, MeanAbsolutePercentageError
 
 
-def mean_FE(output, target, z_buffer=0.0):
-    return torch.mean(
-        (torch.abs((target+z_buffer) - output)) / (target + z_buffer)
-    )
-
-
-def max_FE(output, target, z_buffer=0.0):
-    return torch.max(
-        (torch.abs((target+z_buffer) - output) ) / (target + z_buffer)
-    )
-
-
-class TrainingNeuralNet(pl.LightningModule):
+class Layers(nn.Module):
     def __init__(
         self,
         n_parameters: int,
         n_energies: int,
         n_hidden_layers: int,
         n_nodes: int,
-        learning_rate: float = 1e-3,
+        dropout: Optional[float] = None,
         use_batch_norm: bool = False,
     ) -> None:
+
         super().__init__()
 
-        self.learning_rate = learning_rate
-
         self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
 
         layers: List[nn.Module] = []
 
@@ -41,6 +28,9 @@ class TrainingNeuralNet(pl.LightningModule):
         for i in range(n_hidden_layers):
 
             layers.append(nn.Linear(current_input_dim, n_nodes))
+            if dropout is not None:
+                layers.append(nn.Dropout(dropout))
+
             layers.append(self.relu)
 
             if use_batch_norm:
@@ -52,76 +42,102 @@ class TrainingNeuralNet(pl.LightningModule):
         layers.append(nn.Linear(current_input_dim, n_energies))
 
         self.layers: nn.Module = nn.Sequential(*layers)
-        self.accuracy_max = max_FE
-        self.accuracy_mean = mean_FE
-        self.loss = nn.L1Loss(reduction="sum")
 
     def forward(self, x):
-        #return self.relu(self.layers.forward(x))
+        return self.layers.forward(x)
+
+
+class TrainingNeuralNet(pl.LightningModule):
+    def __init__(
+        self,
+        n_parameters: int,
+        n_energies: int,
+        n_hidden_layers: int,
+        n_nodes: int,
+        use_batch_norm: bool = False,
+        dropout: Optional[float] = None,
+        learning_rate: float = 1e-3,
+    ) -> None:
+        super().__init__()
+
+        self.learning_rate = learning_rate
+
+        self.layers: nn.Module = Layers(
+            n_parameters,
+            n_energies,
+            n_hidden_layers,
+            n_nodes,
+            dropout,
+            use_batch_norm,
+        )
+
+        self.train_loss = MeanAbsoluteError()
+        self.val_loss = MeanAbsoluteError()
+
+        self.train_accuracy = MeanAbsolutePercentageError()
+
+        self.val_accuracy = MeanAbsolutePercentageError()
+
+    def forward(self, x):
+        # return self.relu(self.layers.forward(x))
 
         return self.layers.forward(x)
+
+
+    def initialize_weights(self) -> None:
+
+        def init_weights(m):
+            if isinstance(m, torch.nn.Linear):
+                torch.nn.init.xavier_uniform_(m.weight)
+                m.bias.data.fill_(0.01)
+
+        self.layers.apply(init_weights)
+
 
     def training_step(self, batch, batch_idx: int) -> Dict[str, Any]:
 
         # get the data
         x, y = batch
 
-        y_hat = self.forward(x)
+        pred = self.forward(x)
 
-        loss = self.loss(y_hat, y)
-
-        nz = y > 0
-
-        acc_max = self.accuracy_max(y_hat[nz], y[nz])
-        acc_mean = self.accuracy_mean(y_hat[nz], y[nz])
-
-        # acc_max = self.accuracy_max(y_hat, y, 1e-30)
-        # acc_mean = self.accuracy_mean(y_hat, y, 1e-30)
-
-        # Logging to TensorBoard by default
+        loss = self.train_loss(pred, y)
 
         self.log(
             "train_loss",
-            loss,
+            self.train_loss,
             on_epoch=True,
             on_step=True,
             prog_bar=True,
         )
-        self.log(
-            "performance",
-            {"train_accuracy_max": acc_max, "train_accuracy_mean": acc_mean},
-            on_step=False,
-            on_epoch=True,
-        )
+        # self.log(
+        #     "performance",
+        #     {"train_accuracy_max": acc_max, "train_accuracy_mean": acc_mean},
+        #     on_step=False,
+        #     on_epoch=True,
+        # )
 
         return loss
 
     def validation_step(self, batch, batch_idx: int) -> Dict[str, Any]:
         x, y = batch
-        y_hat = self.forward(x)
-        loss = self.loss(y_hat, y)
+        pred = self.forward(x)
 
-        nz = y > 0
+        loss = self.val_loss(pred, y)
 
-        acc_max = self.accuracy_max(y_hat[nz], y[nz])
-        acc_mean = self.accuracy_mean(y_hat[nz], y[nz])
-
-        # acc_max = self.accuracy_max(y_hat, y, 1e-30)
-        # acc_mean = self.accuracy_mean(y_hat, y, 1e-30)
+        self.val_accuracy(pred, y)
 
         self.log(
-            "validation_loss",
-            loss,
+            "val_loss",
+            self.val_loss,
             on_epoch=True,
             on_step=False,
             prog_bar=True,
         )
+
         self.log(
-            "performance",
-            {
-                "validation_accuracy_max": acc_max,
-                "validation_accuracy_mean": acc_mean,
-            },
+            "val_accuracy",
+            self.val_accuracy,
             on_step=False,
             on_epoch=True,
         )
@@ -130,6 +146,7 @@ class TrainingNeuralNet(pl.LightningModule):
 
     def configure_optimizers(self) -> Dict[str, Any]:
 
+        #optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
         optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
         # scheduler = torch.optim.lr_scheduler.CyclicLR(
         #     optimizer,
@@ -140,14 +157,14 @@ class TrainingNeuralNet(pl.LightningModule):
         #     gamma=0.85,
         # )
 
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=5, gamma=0.5
-        )
+        # scheduler = torch.optim.lr_scheduler.StepLR(
+        #     optimizer, step_size=5, gamma=0.5
+        # )
 
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "train_loss",
-            },
+            # "lr_scheduler": {
+            #     "scheduler": scheduler,
+            #     "monitor": "train_loss",
+            # },
         }

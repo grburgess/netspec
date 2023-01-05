@@ -15,6 +15,7 @@ from ronswanson.database import dataclass
 from torch import Tensor, from_numpy, nn, no_grad
 
 from .training import Transformer
+from .training.training_model import Layers
 from .utils import (
     recursively_load_dict_contents_from_group,
     recursively_save_dict_contents_to_group,
@@ -36,32 +37,21 @@ class NeuralNet(nn.Module):
         n_hidden_layers: int,
         n_nodes: int,
         use_batch_norm: bool = False,
+        dropout: Optional[float] = None,
     ) -> None:
         super().__init__()
 
-        layers: List[nn.Module] = []
-
-        current_input_dim = n_parameters
-
-        for i in range(n_hidden_layers):
-
-            layers.append(nn.Linear(current_input_dim, n_nodes))
-            layers.append(nn.ReLU())
-
-            if use_batch_norm:
-
-                layers.append(nn.BatchNorm1d(n_nodes))
-
-            current_input_dim = n_nodes
-
-        layers.append(nn.Linear(current_input_dim, n_energies))
-
-        self.layers: nn.Module = nn.Sequential(*layers)
+        self.layers: nn.Module = Layers(
+            n_parameters,
+            n_energies,
+            n_hidden_layers,
+            n_nodes,
+            dropout,
+            use_batch_norm,
+        )
 
     def forward(self, x):
         return self.layers(x)
-
-
 
 
 # def save_model(model_name: str, transformer:, checkpoint_file: str) -> None:
@@ -210,7 +200,6 @@ class EmulatorModel(Function1D, metaclass=FunctionMeta):
         :return: none
         """
 
-
         self._log_interp: bool = log_interp
 
         # Get the data directory
@@ -332,10 +321,18 @@ class EmulatorModel(Function1D, metaclass=FunctionMeta):
 
         if self._log_interp:
 
-
-            return np.interp(np.log(energies * (1 + redshift)), np.log(e_tilde), net_output) / scale
+            return (
+                np.interp(
+                    np.log(energies * (1 + redshift)),
+                    np.log(e_tilde),
+                    net_output,
+                )
+                / scale
+            )
 
         else:
 
-
-            return np.interp(energies * (1 + redshift), e_tilde, net_output) / scale
+            return (
+                np.interp(energies * (1 + redshift), e_tilde, net_output)
+                / scale
+            )

@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Tuple, List
 from torch import optim, nn, utils, Tensor
 import torch
 import pytorch_lightning as pl
-from torchmetrics import MeanAbsoluteError, MeanAbsolutePercentageError
+from torchmetrics import MeanAbsoluteError, MeanAbsolutePercentageError, SymmetricMeanAbsolutePercentageError
 
 
 class Layers(nn.Module):
@@ -74,9 +74,9 @@ class TrainingNeuralNet(pl.LightningModule):
         self.train_loss = MeanAbsoluteError()
         self.val_loss = MeanAbsoluteError()
 
-        self.train_accuracy = MeanAbsolutePercentageError()
+        self.train_accuracy = SymmetricMeanAbsolutePercentageError()
 
-        self.val_accuracy = MeanAbsolutePercentageError()
+        self.val_accuracy = SymmetricMeanAbsolutePercentageError()
 
     def forward(self, x):
         # return self.relu(self.layers.forward(x))

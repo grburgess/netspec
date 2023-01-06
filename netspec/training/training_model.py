@@ -3,7 +3,11 @@ from typing import Any, Dict, Optional, Tuple, List
 from torch import optim, nn, utils, Tensor
 import torch
 import pytorch_lightning as pl
-from torchmetrics import MeanAbsoluteError, MeanAbsolutePercentageError, SymmetricMeanAbsolutePercentageError
+from torchmetrics import (
+    MeanAbsoluteError,
+    MeanAbsolutePercentageError,
+    SymmetricMeanAbsolutePercentageError,
+)
 
 
 class Layers(nn.Module):
@@ -79,20 +83,16 @@ class TrainingNeuralNet(pl.LightningModule):
         self.val_accuracy = SymmetricMeanAbsolutePercentageError()
 
     def forward(self, x):
-        # return self.relu(self.layers.forward(x))
 
         return self.layers.forward(x)
 
-
     def initialize_weights(self) -> None:
-
         def init_weights(m):
             if isinstance(m, torch.nn.Linear):
                 torch.nn.init.xavier_uniform_(m.weight)
                 m.bias.data.fill_(0.01)
 
         self.layers.apply(init_weights)
-
 
     def training_step(self, batch, batch_idx: int) -> Dict[str, Any]:
 
@@ -110,12 +110,6 @@ class TrainingNeuralNet(pl.LightningModule):
             on_step=True,
             prog_bar=True,
         )
-        # self.log(
-        #     "performance",
-        #     {"train_accuracy_max": acc_max, "train_accuracy_mean": acc_mean},
-        #     on_step=False,
-        #     on_epoch=True,
-        # )
 
         return loss
 
@@ -146,7 +140,7 @@ class TrainingNeuralNet(pl.LightningModule):
 
     def configure_optimizers(self) -> Dict[str, Any]:
 
-        #optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
+        # optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
         optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
         # scheduler = torch.optim.lr_scheduler.CyclicLR(
         #     optimizer,

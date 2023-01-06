@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple
 
 import torch
-from torch import Tensor, utils
+from torch import Tensor, _pin_memory, utils
 import pytorch_lightning as pl
 
 
@@ -36,6 +36,7 @@ class Lore(pl.LightningDataModule):
         val_num_workers: int = 1,
 
         split_ratio: float = 0.2,
+            pin_memory: bool = False
     ) -> None:
 
         super().__init__()
@@ -53,6 +54,8 @@ class Lore(pl.LightningDataModule):
 
         self._train_num_workers: int = train_num_workers
         self._val_num_workers: int = val_num_workers
+
+        self._pin_memory: bool = pin_memory
 
         # split the data
 
@@ -80,7 +83,8 @@ class Lore(pl.LightningDataModule):
             self._train_set,
             batch_size=self._train_batch_size,
             shuffle=True,
-            num_workers=self._train_num_workers
+            num_workers=self._train_num_workers,
+            pin_memory=self._pin_memory
         )
 
         return train_loader
@@ -91,7 +95,8 @@ class Lore(pl.LightningDataModule):
             self._valid_set,
             batch_size=self._val_batch_size,
             shuffle=False,
-            num_workers=self._val_num_workers
+            num_workers=self._val_num_workers,
+            pin_memory=self._pin_memory
         )
 
         return valid_loader

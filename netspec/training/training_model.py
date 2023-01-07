@@ -61,6 +61,7 @@ class TrainingNeuralNet(pl.LightningModule):
         use_batch_norm: bool = False,
         dropout: Optional[float] = None,
         learning_rate: float = 1e-3,
+        use_mape: bool = False,
     ) -> None:
         super().__init__()
 
@@ -78,9 +79,19 @@ class TrainingNeuralNet(pl.LightningModule):
         self.train_loss = MeanAbsoluteError()
         self.val_loss = MeanAbsoluteError()
 
-        self.train_accuracy = SymmetricMeanAbsolutePercentageError()
+        self._use_mape: bool = use_mape
 
-        self.val_accuracy = SymmetricMeanAbsolutePercentageError()
+        if not self._use_mape:
+
+            self.train_accuracy = SymmetricMeanAbsolutePercentageError()
+
+            self.val_accuracy = SymmetricMeanAbsolutePercentageError()
+
+        else:
+
+            self.train_accuracy = MeanAbsolutePercentageError()
+
+            self.val_accuracy = MeanAbsolutePercentageError()
 
     def forward(self, x):
 
@@ -119,7 +130,15 @@ class TrainingNeuralNet(pl.LightningModule):
 
         loss = self.val_loss(pred, y)
 
-        self.val_accuracy(pred, y)
+        if self._use_mape:
+
+            nz_idx = torch.nonzero(y)
+
+            self.val_accuracy(pred[nz_idx], y[nz_idx])
+
+        else:
+
+            self.val_accuracy(pred, y)
 
         self.log(
             "val_loss",

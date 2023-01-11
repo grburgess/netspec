@@ -12,7 +12,7 @@ from astromodels.functions.function import Function1D, FunctionMeta
 from astromodels.utils import get_user_data_path
 from numba.core import descriptors
 from ronswanson.database import dataclass
-from torch import Tensor, from_numpy, nn, no_grad
+from torch import Tensor, dropout, from_numpy, nn, no_grad
 
 from .training import Transformer
 from .training.training_model import Layers
@@ -27,6 +27,47 @@ log = setup_logger(__name__)
 
 class MissingDataFile(RuntimeError):
     pass
+
+
+class Layers(nn.Module):
+    def __init__(
+        self,
+        n_parameters: int,
+        n_energies: int,
+        n_hidden_layers: int,
+        n_nodes: int,
+        dropout: Optional[float] = None,
+        use_batch_norm: bool = False,
+    ) -> None:
+
+        super().__init__()
+
+        self.relu = nn.ReLU()
+
+        layers: List[nn.Module] = []
+
+        current_input_dim = n_parameters
+
+        for i in range(n_hidden_layers):
+
+            layers.append(nn.Linear(current_input_dim, n_nodes))
+            if dropout is not None:
+                layers.append(nn.Dropout(dropout))
+
+            layers.append(self.relu)
+
+            if use_batch_norm:
+
+                layers.append(nn.BatchNorm1d(n_nodes))
+
+            current_input_dim = n_nodes
+
+        layers.append(nn.Linear(current_input_dim, n_energies))
+
+        self.layers: nn.Module = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers.forward(x)
 
 
 class NeuralNet(nn.Module):
@@ -65,7 +106,8 @@ class ModelParams:
     n_energies: int
     n_hidden_layers: int
     n_nodes: int
-    use_batch_norm: bool
+     use_batch_norm: bool
+    dropout: Optional[float] = None
 
 
 class ModelStorage:

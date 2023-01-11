@@ -10,45 +10,8 @@ from torchmetrics import (
 )
 
 
-class Layers(nn.Module):
-    def __init__(
-        self,
-        n_parameters: int,
-        n_energies: int,
-        n_hidden_layers: int,
-        n_nodes: int,
-        dropout: Optional[float] = None,
-        use_batch_norm: bool = False,
-    ) -> None:
-
-        super().__init__()
-
-        self.relu = nn.ReLU()
-
-        layers: List[nn.Module] = []
-
-        current_input_dim = n_parameters
-
-        for i in range(n_hidden_layers):
-
-            layers.append(nn.Linear(current_input_dim, n_nodes))
-            if dropout is not None:
-                layers.append(nn.Dropout(dropout))
-
-            layers.append(self.relu)
-
-            if use_batch_norm:
-
-                layers.append(nn.BatchNorm1d(n_nodes))
-
-            current_input_dim = n_nodes
-
-        layers.append(nn.Linear(current_input_dim, n_energies))
-
-        self.layers: nn.Module = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.layers.forward(x)
+from netspec.emulator import ModelParams, ModelStorage, Layers
+from netspec.training.training_data_tools import Transformer
 
 
 class TrainingNeuralNet(pl.LightningModule):
@@ -64,6 +27,13 @@ class TrainingNeuralNet(pl.LightningModule):
         use_mape: bool = False,
     ) -> None:
         super().__init__()
+
+        self._n_parameters: int = n_parameters
+        self._n_energies: int = n_energies
+        self._n_hidden_layers: int = n_hidden_layers
+        self._n_nodes: int = n_nodes
+        self._dropout: Optional[float] = dropout
+        self._use_batch_norm: bool = use_batch_norm
 
         self.learning_rate = learning_rate
 
@@ -161,23 +131,43 @@ class TrainingNeuralNet(pl.LightningModule):
 
         # optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
         optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
-        # scheduler = torch.optim.lr_scheduler.CyclicLR(
-        #     optimizer,
-        #     base_lr=1e-4,
-        #     max_lr=1e-1,
-        #     step_size_up=5,
-        #     mode="exp_range",
-        #     gamma=0.85,
-        # )
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            optimizer,
+            base_lr=1e-4,
+            max_lr=1e-1,
+            step_size_up=5,
+            mode="exp_range",
+            gamma=0.85,
+        )
 
-        # scheduler = torch.optim.lr_scheduler.StepLR(
-        #     optimizer, step_size=5, gamma=0.5
-        # )
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, step_size=5, gamma=0.5
+        )
 
         return {
             "optimizer": optimizer,
-            # "lr_scheduler": {
-            #     "scheduler": scheduler,
-            #     "monitor": "train_loss",
-            # },
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "train_loss",
+            },
         }
+
+    def save_model(
+        self, file_name: Union[str, Path], checkpoint, transformer: Transformer
+    ) -> None:
+
+        model_params: ModelParams = ModelParams(
+            self._n_parameters,
+            self._n_energies,
+            self._n_hidden_layers,
+            self._n_nodes,
+            self._use_batch_norm,
+            self._dropout,
+        )
+
+        model_storage: ModelStorage = ModelStorage(
+            model_params, transformer, checkpoint["state_dict"]
+        )
+
+
+        model_storage.save_to_user_dir(file_name)

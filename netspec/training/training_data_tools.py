@@ -292,13 +292,24 @@ class TransformedData:
     def params(self) -> np.ndarray:
         return self._params
 
+    @property
+    def transformer(self) -> Transformer:
+        return self._transformer
+
+
+
 
 def prepare_training_data(
     database: Database,
     file_name_stub: str,
     normalization_factor: float = 1.0,
     dirty_data_check: bool = False,
+    **sub_selections,
 ) -> None:
+
+    if sub_selections:
+
+        database = database.new_from_selections(**sub_selections)
 
     # remove all zero rows
     zero_idx = database.values.sum(axis=1) == 0

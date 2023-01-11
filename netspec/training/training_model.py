@@ -131,14 +131,6 @@ class TrainingNeuralNet(pl.LightningModule):
 
         # optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
         optimizer = optim.NAdam(self.parameters(), lr=self.learning_rate)
-        scheduler = torch.optim.lr_scheduler.CyclicLR(
-            optimizer,
-            base_lr=1e-4,
-            max_lr=1e-1,
-            step_size_up=5,
-            mode="exp_range",
-            gamma=0.85,
-        )
 
         scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=5, gamma=0.5

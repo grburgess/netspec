@@ -106,7 +106,7 @@ class ModelParams:
     n_energies: int
     n_hidden_layers: int
     n_nodes: int
-     use_batch_norm: bool
+    use_batch_norm: bool
     dropout: Optional[float] = None
 
 

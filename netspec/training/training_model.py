@@ -1,16 +1,17 @@
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
-from torch import optim, nn
-import torch
+
 import pytorch_lightning as pl
+import torch
+from torch import nn, optim
 from torchmetrics import (
     MeanAbsoluteError,
     MeanAbsolutePercentageError,
     SymmetricMeanAbsolutePercentageError,
 )
 
-
-from ..utils.model_utils import ModelParams, ModelStorage, Layers
-from netspec.training.training_data_tools import Transformer
+import netspec.training.training_data_tools as tdt
+import netspec.utils.model_utils as mutils
 
 
 class TrainingNeuralNet(pl.LightningModule):
@@ -36,7 +37,7 @@ class TrainingNeuralNet(pl.LightningModule):
 
         self.learning_rate = learning_rate
 
-        self.layers: nn.Module = Layers(
+        self.layers: nn.Module = mutils.Layers(
             n_parameters,
             n_energies,
             n_hidden_layers,
@@ -155,11 +156,11 @@ class TrainingNeuralNet(pl.LightningModule):
         self,
         file_name: Union[str, Path],
         checkpoint,
-        transformer: Transformer,
+        transformer: tdt.Transformer,
         overwrite: bool = False,
     ) -> None:
 
-        model_params: ModelParams = ModelParams(
+        model_params: mutils.ModelParams = mutils.ModelParams(
             self._n_parameters,
             self._n_energies,
             self._n_hidden_layers,
@@ -168,7 +169,7 @@ class TrainingNeuralNet(pl.LightningModule):
             self._dropout,
         )
 
-        model_storage: ModelStorage = ModelStorage(
+        model_storage: mutils.ModelStorage = mutils.ModelStorage(
             model_params, transformer, checkpoint["state_dict"]
         )
 

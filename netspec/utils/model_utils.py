@@ -8,7 +8,8 @@ from astromodels.utils import get_user_data_path
 from ronswanson.database import dataclass
 from torch import Tensor, from_numpy, nn, no_grad
 
-from ..training.training_data_tools import Transformer
+import netspec.training.training_data_tools as tdt
+
 from ..utils import (
     recursively_load_dict_contents_from_group,
     recursively_save_dict_contents_to_group,
@@ -84,7 +85,6 @@ class NeuralNet(nn.Module):
         return self.layers(x)
 
 
-
 @dataclass
 class ModelParams:
     n_parameters: int
@@ -99,12 +99,12 @@ class ModelStorage:
     def __init__(
         self,
         model_params: ModelParams,
-        transformer: Transformer,
+        transformer: tdt.Transformer,
         state_dict: Dict[Any, Any],
     ):
 
         self._neural_net: NeuralNet = NeuralNet(**asdict(model_params))
-        self._transformer: Transformer = transformer
+        self._transformer: tdt.Transformer = transformer
 
         self._neural_net.load_state_dict(state_dict)
         self._neural_net.eval()
@@ -112,7 +112,7 @@ class ModelStorage:
         self._model_params = model_params
 
     @property
-    def transformer(self) -> Transformer:
+    def transformer(self) -> tdt.Transformer:
         return self._transformer
 
     def evaluate(self, params) -> np.ndarray:
@@ -134,7 +134,9 @@ class ModelStorage:
 
         with h5py.File(file_name, "r") as f:
 
-            transformer: Transformer = Transformer.from_file(f["transformer"])
+            transformer: tdt.Transformer = tdt.Transformer.from_file(
+                f["transformer"]
+            )
 
             state_dict = recursively_load_dict_contents_from_group(
                 f, "state_dict"

@@ -153,7 +153,11 @@ class TrainingNeuralNet(pl.LightningModule):
         }
 
     def save_model(
-        self, file_name: Union[str, Path], checkpoint, transformer: Transformer
+        self,
+        file_name: Union[str, Path],
+        checkpoint,
+        transformer: Transformer,
+        overwrite: bool = False,
     ) -> None:
 
         model_params: ModelParams = ModelParams(
@@ -169,5 +173,4 @@ class TrainingNeuralNet(pl.LightningModule):
             model_params, transformer, checkpoint["state_dict"]
         )
 
-
-        model_storage.save_to_user_dir(file_name)
+        model_storage.save_to_user_dir(file_name, overwrite)

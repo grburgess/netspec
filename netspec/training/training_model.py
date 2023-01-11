@@ -1,6 +1,5 @@
-import numpy as np
-from typing import Any, Dict, Optional, Tuple, List
-from torch import optim, nn, utils, Tensor
+from typing import Any, Dict, Optional, Union
+from torch import optim, nn
 import torch
 import pytorch_lightning as pl
 from torchmetrics import (
@@ -10,7 +9,7 @@ from torchmetrics import (
 )
 
 
-from netspec.emulator import ModelParams, ModelStorage, Layers
+from ..utils.model_utils import ModelParams, ModelStorage, Layers
 from netspec.training.training_data_tools import Transformer
 
 
